@@ -1,0 +1,53 @@
+spring:
+  application:
+    name: lead-management-saas
+
+  profiles:
+    active: dev
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+# Phase 5 — request protection (both enforced by servlet filters in the
+# security chain, after JwtAuthenticationFilter sets TenantContext)
+leadmanagement:
+  rate-limit:
+    max-requests-per-hour: 1000   # per tenant, lead ingestion only (fixed window)
+  idempotency:
+    ttl-hours: 24                 # replay window for X-Idempotency-Key responses
+
+# Outbox background processing — Phase 4 solved the background-thread
+# tenant problem (see DEBUGGING.md section 3): SYSTEM_TENANT_ID sentinel for
+# the cross-tenant claim query, per-event TenantContext for processing.
+outbox:
+  processor:
+    enabled: true
+
+logging:
+  level:
+    com.leadmanagement: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] [%X{correlationId}] [%X{tenantId}] %-5level %logger{36} - %msg%n"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
